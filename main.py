@@ -31,7 +31,7 @@ def binarize_image(img, nb_classes=3):
     thresh = threshold_multiotsu(img, classes = nb_classes)[0]
     return img < thresh
 
-def extract_components(img, blob_thresh=10):
+def extract_components(img, blob_thresh=30):
     """
     Extracts labeled connected components from the binarized image, removing  
     components with area smaller than blob_thresh
