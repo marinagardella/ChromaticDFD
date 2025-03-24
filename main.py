@@ -135,6 +135,7 @@ def detect_parallelized(img_path, mask_path, alpha, threshold):
     """Detects outliers in an image using parallel processing across three channels."""
     img = load_image(img_path)
     chroma_img = get_chromatic_image(img)
+    cv2.imwrite(f'chroma.png', chroma_img)
     
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(process_channel, ch, img, chroma_img, mask_path, alpha, threshold) 
