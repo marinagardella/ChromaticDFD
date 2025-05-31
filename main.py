@@ -6,6 +6,7 @@ import cv2
 import os
 from imutils.object_detection import non_max_suppression
 import argparse
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.realpath(__file__))
 
@@ -175,7 +176,7 @@ def detect_nonparallelized(img_path, alpha, threshold):
 
 from concurrent.futures import ThreadPoolExecutor
 
-def process_channel(ch, img, chroma_img, text_mask, alpha, threshold):
+def process_channel(ch, img, chroma_img, text_mask, alpha, threshold, output_path):
     """Processes a single channel in parallel."""
     img_ch = img[:, :, ch]
     chroma_ch = chroma_img[:, :, ch]
@@ -189,33 +190,43 @@ def process_channel(ch, img, chroma_img, text_mask, alpha, threshold):
     nfa = compute_NFA(outliers, chars, text_mask, threshold, alpha)
 
     # Save output images
-    cv2.imwrite(f'characters_{ch}.png', chars * 255)
-    cv2.imwrite(f'outliers_{ch}.png', outliers)
-    cv2.imwrite(f'nfa_{ch}.png', nfa * 255)
-    cv2.imwrite(f'stds_{ch}.png', stds_img * 255)
+    cv2.imwrite(output_path + f'/characters_{ch}.png', chars * 255)
+    cv2.imwrite(output_path + f'/outliers_{ch}.png', outliers)
+    cv2.imwrite(output_path + f'/nfa_{ch}.png', nfa * 255)
+    cv2.imwrite(output_path + f'/stds_{ch}.png', stds_img * 255)
     
 
-def detect_parallelized(img_path, alpha, threshold):
+def detect_parallelized(img_path, alpha, threshold, output_path):
     """Detects outliers in an image using parallel processing across three channels."""
+    sub_folder = os.path.splitext(os.path.basename(img_path))[-2]
+    if not os.path.exists(output_path + sub_folder):
+        os.makedirs(output_path + sub_folder)
     img = load_image(img_path)
     chroma_img = get_chromatic_image(img)
-    cv2.imwrite(f'chroma.png', chroma_img)
+    cv2.imwrite(output_path + sub_folder + '/chroma.png', chroma_img)
     east_model_path = os.path.join(ROOT, 'frozen_east_text_detection.pb')
     text_mask = detect_text(img, east_model_path)
-    cv2.imwrite('words.png', text_mask)
+    cv2.imwrite(output_path + sub_folder + '/words.png', text_mask)
     
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(process_channel, ch, img, chroma_img, text_mask, alpha, threshold) 
+        futures = [executor.submit(process_channel, ch, img, chroma_img, text_mask, alpha, threshold, output_path + sub_folder) 
                    for ch in range(3)]
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("image")
+    parser.add_argument("dataset_path")
+    parser.add_argument("output_path")
     parser.add_argument("-a")
     parser.add_argument("-t")
     parser.parse_args()
     args = parser.parse_args()
-    img_path = args.image
+    path = args.dataset_path
+    output_path = args.output_path
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    #mask_path = args.mask
     alpha = float(args.a)
     trheshold = float(args.t)
-    detect_parallelized(img_path, alpha, trheshold)
+    for img in Path(path).glob('*.tif'):
+        print(f"Processing {img}")
+        detect_parallelized(str(img), alpha, trheshold, output_path)
