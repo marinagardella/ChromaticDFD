@@ -175,12 +175,12 @@ def detect_nonparallelized(img_path, alpha, threshold):
 
 from concurrent.futures import ThreadPoolExecutor
 
-def process_channel(ch, img, chroma_img, text_mask, alpha, threshold):
+def process_channel(ch, img, chroma_img, blob_thresh, text_mask, alpha, threshold):
     """Processes a single channel in parallel."""
     img_ch = img[:, :, ch]
     chroma_ch = chroma_img[:, :, ch]
     
-    labeled_objects, labels = extract_components(img_ch)
+    labeled_objects, labels = extract_components(img_ch, blob_thresh)
     chars = (labeled_objects > 0)
     
     stds, stds_img = compute_std_per_label(chroma_ch, labeled_objects, labels)
@@ -195,7 +195,7 @@ def process_channel(ch, img, chroma_img, text_mask, alpha, threshold):
     cv2.imwrite(f'stds_{ch}.png', stds_img * 255)
     
 
-def detect_parallelized(img_path, alpha, threshold):
+def detect_parallelized(img_path, blob_thresh, alpha, threshold):
     """Detects outliers in an image using parallel processing across three channels."""
     img = load_image(img_path)
     chroma_img = get_chromatic_image(img)
@@ -205,12 +205,13 @@ def detect_parallelized(img_path, alpha, threshold):
     cv2.imwrite('words.png', text_mask)
     
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(process_channel, ch, img, chroma_img, text_mask, alpha, threshold) 
+        futures = [executor.submit(process_channel, ch, img, chroma_img, blob_thresh, text_mask, alpha, threshold) 
                    for ch in range(3)]
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
+    parser.add_argument("-b")
     parser.add_argument("-a")
     parser.add_argument("-t")
     parser.parse_args()
@@ -218,4 +219,5 @@ if __name__ == "__main__":
     img_path = args.image
     alpha = float(args.a)
     trheshold = float(args.t)
-    detect_parallelized(img_path, alpha, trheshold)
+    blob_thresh = float(args.b)
+    detect_parallelized(img_path, blob_thresh, alpha, trheshold)
